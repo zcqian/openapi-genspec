@@ -11,12 +11,13 @@ class _BaseOpenAPIObject:
         'string': str,
         'integer': int,
         'number': float,
+        'boolean': bool,
     }
     _validation_expr = [
         (r'^([A-Za-z_][A-Za-z0-9_]+)$', 'simple'),
         (r'^\[(.+)]$', 'list'),
         (r'^Map\[(.+),(.+)]$', 'map'),
-        (r'^(.+?)\|(.+)$', 'or'),  # hacky, but as of now this should work fine
+        (r'^(.+?)\|(.+)$', 'or'),  # hacky, but as of now this works fine
     ]
 
     def __init__(self):
@@ -276,6 +277,60 @@ class PathItem(_BaseOpenAPIObject):
         'parameters': '[Parameter|Reference]',
     }
     EXTENSIONS = True
+
+
+class Operation(_BaseOpenAPIObject):
+    REQUIRED_FIELDS = {
+        'responses': 'Responses',
+    }
+    OPTIONAL_FIELDS = {
+        'tags': '[string]',
+        'summary': 'string',
+        'description': 'string',
+        'externalDocs': 'ExternalDocumentation',
+        'operationId': 'string',
+        'parameters': 'Parameter|Reference',
+        'requestBody': 'RequestBody|Reference',
+        'callbacks': 'Map[string, Callback|Reference]',
+        'deprecated': 'boolean',
+        'security': 'SecurityRequirement',
+        'servers': '[Server]',
+    }
+    EXTENSIONS = True
+
+
+class ExternalDocumentation(_BaseOpenAPIObject):
+    REQUIRED_FIELDS = {
+        'url': 'string',
+    }
+    OPTIONAL_FIELDS = {
+        'description': 'string',
+    }
+    EXTENSIONS = True
+
+
+class Parameter(_BaseOpenAPIObject):
+    REQUIRED_FIELDS = {
+        'name': 'string',
+        'in': 'string',
+        'required': 'boolean',
+    }
+    OPTIONAL_FIELDS = {
+        'description': 'string',
+        'required': 'boolean',
+        'deprecated': 'boolean',
+    }
+    # FIXME: implement
+
+    def validate(self):
+        super().validate()
+        if self['in'] not in ["query", "header", "path", "cookie"]:
+            raise ValueError("'in' must be one of query/header/path/cookie")
+        if self['in'] == "path":
+            if self['required'] is True:
+                pass
+            else:
+                raise ValueError()
 
 
 class Schema(_BaseOpenAPIObject):
