@@ -53,6 +53,13 @@ class _HasDescription(_BaseContext):
         return self
 
 
+class _HasExternalDocs(_BaseContext):
+    def external_docs(self, url):
+        ext_doc_context = OpenAPIExternalDocsContext(self, url)
+        self.document['externalDocs'] = ext_doc_context.document
+        return ext_doc_context
+
+
 class _HasTags(_BaseContext):
     def tag(self, t):
         tags = self.document.setdefault('tag', [])
@@ -60,7 +67,7 @@ class _HasTags(_BaseContext):
         return self
 
 
-class OpenAPIContext(_BaseContext):
+class OpenAPIContext(_HasExternalDocs):
     def __init__(self, title: str, version: str,
                  description: Optional[str] = None):
         super(OpenAPIContext, self).__init__()
@@ -124,8 +131,15 @@ class OpenAPIContext(_BaseContext):
         self._update_optional_fields('info.license', ['url'], kwargs)
         return self
 
-    def server(self):
-        pass
+    def server(self, url: str, description: Optional[str] = None):
+        servers = self.document.setdefault('servers', [])
+        server = {
+            'url': url
+        }
+        if description:
+            server['description'] = description
+        servers.append(server)
+        return self
 
     def path(self, path: str,
              summary: Optional[str] = None,
@@ -167,8 +181,8 @@ class OpenAPIPathContext(_ChildContext, _HasSummary, _HasDescription,
             return super(OpenAPIPathContext, self).__getattr__(attr_name)
 
 
-class OpenAPIOperation(_ChildContext, _HasSummary,
-                       _HasDescription, _HasParameters, _HasTags):
+class OpenAPIOperation(_ChildContext, _HasSummary, _HasExternalDocs, _HasTags,
+                       _HasDescription, _HasParameters):
     def __init__(self, parent):
         super(OpenAPIOperation, self).__init__(parent)
         self.document = {
@@ -227,3 +241,11 @@ class OpenAPIParameterContext(_ChildContext, _HasDescription):
                 schema[k] = v
         self.schema(schema)
         return self
+
+
+class OpenAPIExternalDocsContext(_ChildContext, _HasDescription):
+    def __init__(self, parent, url):
+        super(OpenAPIExternalDocsContext, self).__init__(parent)
+        self.document = {
+            'url': url,
+        }
