@@ -34,36 +34,11 @@ class _ChildContext(_BaseContext):
 
 
 class _HasParameters(_BaseContext):
-    def parameter(self, name, in_, required,
-                  type_: Optional[str] = None,
-                  schema: Optional[dict] = None,
-                  description: Optional[str] = None,
-                  **kwargs):
+    def parameter(self, name, in_, required):
         parameters = self.document.setdefault('parameters', [])
-        parameter = {
-            'name': name,
-            'in': in_,
-            'required': required
-        }
-        for k in ['description', 'required', 'deprecated', 'allowEmptyValue',
-                  'style', 'explode', 'allowReserved']:
-            v = kwargs.get(k, None)
-            if v:
-                parameter[k] = v
-        if type_ and schema:  # shouldn't define both
-            raise ValueError("schema and type both defined. Choose only one.")
-        if type_:
-            schema = {'type': type_}
-            for k in ['minimum', 'maximum', 'default']:
-                v = kwargs.get(k)
-                if v:
-                    schema[k] = v
-        if schema:
-            parameter['schema'] = schema
-        if description:
-            parameter['description'] = description
-        parameters.append(parameter)
-        return self
+        param_context = OpenAPIParameterContext(self, name, in_, required)
+        parameters.append(param_context.document)
+        return param_context
 
 
 class _HasSummary(_BaseContext):
@@ -174,16 +149,18 @@ class OpenAPIPathContext(_ChildContext, _HasSummary, _HasDescription,
     #         #     return self._method_operation(method)
     #         self.__setattr__(method, lambda: self._method_operation(method))
 
-    def _method_operation(self, method):
-        operation = OpenAPIOperation(self, 'Success')
-        self.document[method] = operation.document
-        return operation
+    def _method_operation(self, method, operation_id: Optional[str] = None):
+        operation_context = OpenAPIOperation(self)
+        self.document[method] = operation_context.document
+        if operation_id:
+            operation_context.operation_id(operation_id)
+        return operation_context
 
     def __getattr__(self, attr_name):
         if attr_name in ['get', 'put', 'post', 'delete', 'options', 'head',
                          'patch', 'trace']:
-            def fn():
-                return self._method_operation(attr_name)
+            def fn(op_id=None):
+                return self._method_operation(attr_name, op_id)
 
             return fn
         else:
@@ -192,16 +169,61 @@ class OpenAPIPathContext(_ChildContext, _HasSummary, _HasDescription,
 
 class OpenAPIOperation(_ChildContext, _HasSummary,
                        _HasDescription, _HasParameters, _HasTags):
-    def __init__(self, parent, success_desc):
+    def __init__(self, parent):
         super(OpenAPIOperation, self).__init__(parent)
         self.document = {
             'responses': {
                 '200': {
-                    'description': success_desc,
+                    'description': "Success",
                 }
             }
         }
 
+    def operation_id(self, op_id):
+        self.document['operationId'] = op_id
+        return self
+
 
 class OpenAPIParameterContext(_ChildContext, _HasDescription):
-    pass
+    def __init__(self, parent, name: str, in_: str, required: bool):
+        super(OpenAPIParameterContext, self).__init__(parent)
+        self.document = {
+            'name': name,
+            'in': in_,
+            'required': required,
+        }
+
+    def deprecated(self, dep: bool):
+        self._set('deprecated', dep)
+        return self
+
+    def allow_empty(self, ae: bool):
+        self._set('allowEmptyValue', ae)
+        return self
+
+    def style(self, sty: str):
+        self._set('style', sty)
+        return self
+
+    def explode(self, exp: bool):
+        self._set('explode', exp)
+        return self
+
+    def allow_reserved(self, ar: bool):
+        self._set('allowReserved', ar)
+        return self
+
+    def schema(self, sch: dict):
+        self._set('schema', sch)
+        return self
+
+    def type(self, typ: str, **kwargs):
+        schema = {
+            'type': typ,
+        }
+        for k in ['minimum', 'maximum', 'default']:
+            v = kwargs.get(k)
+            if v:
+                schema[k] = v
+        self.schema(schema)
+        return self
