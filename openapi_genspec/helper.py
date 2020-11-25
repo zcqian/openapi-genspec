@@ -1,7 +1,7 @@
 from typing import List, Optional
 
 
-class _Base:
+class _BaseContext:
     def __init__(self):
         self.document = {}
 
@@ -9,16 +9,31 @@ class _Base:
         self.document[k] = v
 
 
-class _ChildItem(_Base):
+class _ChildContext(_BaseContext):
     def __init__(self, parent):
         super().__init__()
         self.parent = parent
 
     def end(self):
+        """Explicitly return to the parent context
+
+        Returns:
+            Parent context
+        """
         return self.parent
 
+    def __getattr__(self, attr_name: str):
+        multilevel_allow = ['path', 'get', 'put', 'post', 'delete', 'options',
+                            'head', 'patch', 'trace']
+        if not attr_name.startswith('_'):
+            if attr_name in dir(self.parent) or (
+                    attr_name in multilevel_allow and
+                    hasattr(self.parent, attr_name)):
+                return getattr(self.parent, attr_name)
+        raise AttributeError()
 
-class _HasParameters(_Base):
+
+class _HasParameters(_BaseContext):
     def parameter(self, name, in_, required,
                   type_: Optional[str] = None,
                   schema: Optional[dict] = None,
@@ -51,29 +66,29 @@ class _HasParameters(_Base):
         return self
 
 
-class _HasSummary(_Base):
+class _HasSummary(_BaseContext):
     def summary(self, v):
         self._set('summary', v)
         return self
 
 
-class _HasDescription(_Base):
+class _HasDescription(_BaseContext):
     def description(self, v):
         self._set('description', v)
         return self
 
 
-class _HasTags(_Base):
+class _HasTags(_BaseContext):
     def tag(self, t):
         tags = self.document.setdefault('tag', [])
         tags.append(t)
         return self
 
 
-class OpenAPIDocument(_Base):
+class OpenAPIContext(_BaseContext):
     def __init__(self, title: str, version: str,
                  description: Optional[str] = None):
-        super(OpenAPIDocument, self).__init__()
+        super(OpenAPIContext, self).__init__()
         self.document = {
             'openapi': '3.0.3',
             'info': {
@@ -140,7 +155,7 @@ class OpenAPIDocument(_Base):
     def path(self, path: str,
              summary: Optional[str] = None,
              description: Optional[str] = None):
-        path_item = OpenAPIPathItem(self)
+        path_item = OpenAPIPathContext(self)
         if summary:
             path_item.summary(summary)
         if description:
@@ -149,24 +164,33 @@ class OpenAPIDocument(_Base):
         return path_item
 
 
-class OpenAPIPathItem(_ChildItem, _HasSummary, _HasDescription,
-                      _HasParameters):
+class OpenAPIPathContext(_ChildContext, _HasSummary, _HasDescription,
+                         _HasParameters):
+    # def __init__(self, parent):
+    #     super(OpenAPIPathItem, self).__init__(parent)
+    #     for method in ['get', 'put', 'post', 'delete', 'options', 'head',
+    #                  'patch', 'trace']:
+    #         # def fn():
+    #         #     return self._method_operation(method)
+    #         self.__setattr__(method, lambda: self._method_operation(method))
+
     def _method_operation(self, method):
         operation = OpenAPIOperation(self, 'Success')
         self.document[method] = operation.document
         return operation
 
-    def __getattr__(self, name):
-        if name in ['get', 'put', 'post', 'delete', 'options', 'head',
-                    'patch', 'trace']:
+    def __getattr__(self, attr_name):
+        if attr_name in ['get', 'put', 'post', 'delete', 'options', 'head',
+                         'patch', 'trace']:
             def fn():
-                return self._method_operation(name)
+                return self._method_operation(attr_name)
+
             return fn
         else:
-            raise AttributeError(f'object has no attribute {name}')
+            return super(OpenAPIPathContext, self).__getattr__(attr_name)
 
 
-class OpenAPIOperation(_ChildItem, _HasSummary,
+class OpenAPIOperation(_ChildContext, _HasSummary,
                        _HasDescription, _HasParameters, _HasTags):
     def __init__(self, parent, success_desc):
         super(OpenAPIOperation, self).__init__(parent)
@@ -177,3 +201,7 @@ class OpenAPIOperation(_ChildItem, _HasSummary,
                 }
             }
         }
+
+
+class OpenAPIParameterContext(_ChildContext, _HasDescription):
+    pass

@@ -1,5 +1,5 @@
 import pytest
-from openapi_genspec.helper import OpenAPIDocument
+from openapi_genspec.helper import OpenAPIContext
 
 
 def _basic_document():
@@ -14,7 +14,7 @@ def _basic_document():
 
 
 def test_empty():
-    o = OpenAPIDocument('Title', 'Version')
+    o = OpenAPIContext('Title', 'Version')
     r = _basic_document()
     r['info']['title'] = 'Title'
     r['info']['version'] = 'Version'
@@ -22,7 +22,7 @@ def test_empty():
 
 
 def test_description():
-    o = OpenAPIDocument('Title', 'Version', description='Something')
+    o = OpenAPIContext('Title', 'Version', description='Something')
     r = _basic_document()
     r['info']['title'] = 'Title'
     r['info']['version'] = 'Version'
@@ -31,7 +31,7 @@ def test_description():
 
 
 def test_update_info():
-    o = OpenAPIDocument('Title', 'Version')
+    o = OpenAPIContext('Title', 'Version')
     o.info(
         title='NewTitle'
     ).info(
@@ -47,7 +47,7 @@ def test_update_info():
 
 
 def test_update_contact():
-    o = OpenAPIDocument('Title', 'Version')
+    o = OpenAPIContext('Title', 'Version')
     o.contact(name='SomeOne')
     r = _basic_document()
     r['info']['title'] = 'Title'
@@ -58,7 +58,7 @@ def test_update_contact():
 
 
 def test_update_license_name():
-    o = OpenAPIDocument('Title', 'Version')
+    o = OpenAPIContext('Title', 'Version')
     o.license(name='WTFPL')
     r = _basic_document()
     r['info']['title'] = 'Title'
@@ -69,7 +69,7 @@ def test_update_license_name():
 
 
 def test_update_license_optional():
-    o = OpenAPIDocument('Title', 'Version')
+    o = OpenAPIContext('Title', 'Version')
     o.license(
         name='WTFPL',
         url='http://example.com/'
