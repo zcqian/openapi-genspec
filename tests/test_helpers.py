@@ -1,16 +1,15 @@
-import pytest
 from openapi_genspec.helper import OpenAPIContext
 
 
 def _basic_document():
     return {
-            'openapi': '3.0.3',
-            'info': {
-                'title': '',
-                'version': '',
-            },
-            'paths': {},
-        }
+        'openapi': '3.0.3',
+        'info': {
+            'title': '',
+            'version': '',
+        },
+        'paths': {},
+    }
 
 
 def test_empty():
@@ -80,4 +79,39 @@ def test_update_license_optional():
     r['info']['license'] = {}
     r['info']['license']['name'] = 'WTFPL'
     r['info']['license']['url'] = 'http://example.com/'
+    assert o.document == r
+
+
+def test_add_path():
+    o = OpenAPIContext('t', 't')
+    o.path('/api').get() \
+        .parameter('p', in_='query', required=False) \
+        .type('integer', default=0) \
+        .end() \
+        .path('/api2')
+
+    r = {'openapi': '3.0.3',
+         'info': {'title': 't', 'version': 't'},
+         'paths': {
+             '/api': {
+                 'get': {
+                     'responses': {
+                         '200': {'description': 'Success'}
+                     },
+                     'parameters': [
+                         {
+                             'name': 'p',
+                             'in': 'query',
+                             'required': False,
+                             'schema': {
+                                 'type': 'integer',
+                                 'default': 0,
+                             }
+                         }
+                     ]
+                 }
+             },
+             '/api2': {},
+         }
+         }
     assert o.document == r
