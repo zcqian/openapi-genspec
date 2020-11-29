@@ -237,7 +237,7 @@ class OpenAPIParameterContext(_ChildContext, _HasDescription):
         }
         for k in ['minimum', 'maximum', 'default']:
             v = kwargs.get(k)
-            if v:
+            if v is not None:
                 schema[k] = v
         self.schema(schema)
         return self
