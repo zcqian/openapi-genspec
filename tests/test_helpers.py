@@ -1,3 +1,4 @@
+import pytest
 from openapi_genspec.helper import OpenAPIContext
 
 
@@ -83,7 +84,7 @@ def test_update_license_optional():
 
 
 def test_add_path():
-    o = OpenAPIContext('t', 't')
+    o = OpenAPIContext('t', 'v')
     o.path('/api').get() \
         .parameter('p', in_='query', required=False) \
         .type('integer', default=0) \
@@ -91,7 +92,7 @@ def test_add_path():
         .path('/api2')
 
     r = {'openapi': '3.0.3',
-         'info': {'title': 't', 'version': 't'},
+         'info': {'title': 't', 'version': 'v'},
          'paths': {
              '/api': {
                  'get': {
@@ -115,3 +116,31 @@ def test_add_path():
          }
          }
     assert o.document == r
+
+
+def test_summary():
+    o = OpenAPIContext('t', 'v')
+    o.path('/').summary('sum')
+    r = {
+        'info': {'title': 't', 'version': 'v'},
+        'openapi': '3.0.3',
+        'paths': {'/': {'summary': 'sum'}}
+    }
+    assert o.document == r
+
+
+def test_desc():
+    o = OpenAPIContext('t', 'v')
+    o.path('/').description('d')
+    r = {
+        'info': {'title': 't', 'version': 'v'},
+        'openapi': '3.0.3',
+        'paths': {'/': {'description': 'd'}}
+    }
+    assert o.document == r
+
+
+def test_multilevel_method_call():
+    o = OpenAPIContext('t', 'v')
+    with pytest.raises(AttributeError):
+        o.path('/').get().info('cannot call')
