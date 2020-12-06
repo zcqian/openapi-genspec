@@ -14,7 +14,8 @@ def _basic_document():
 
 
 def test_empty():
-    o = OpenAPIContext('Title', 'Version')
+    o = OpenAPIContext()
+    o.info(title='Title', version='Version')
     r = _basic_document()
     r['info']['title'] = 'Title'
     r['info']['version'] = 'Version'
@@ -22,7 +23,11 @@ def test_empty():
 
 
 def test_description():
-    o = OpenAPIContext('Title', 'Version', description='Something')
+    o = OpenAPIContext()
+    o.info()\
+        .title('Title')\
+        .version('Version')\
+        .description('Something')
     r = _basic_document()
     r['info']['title'] = 'Title'
     r['info']['version'] = 'Version'
@@ -30,61 +35,22 @@ def test_description():
     assert o.document == r
 
 
-def test_update_info():
-    o = OpenAPIContext('Title', 'Version')
-    o.info(
-        title='NewTitle'
-    ).info(
-        version='NewVersion'
-    ).info(
-        termsOfService='http://example.com/'
-    )
-    r = _basic_document()
-    r['info']['title'] = 'NewTitle'
-    r['info']['version'] = 'NewVersion'
-    r['info']['termsOfService'] = 'http://example.com/'
-    assert o.document == r
-
-
-def test_update_contact():
-    o = OpenAPIContext('Title', 'Version')
-    o.contact(name='SomeOne')
-    r = _basic_document()
-    r['info']['title'] = 'Title'
-    r['info']['version'] = 'Version'
-    r['info']['contact'] = {}
-    r['info']['contact']['name'] = 'SomeOne'
-    assert o.document == r
-
-
-def test_update_license_name():
-    o = OpenAPIContext('Title', 'Version')
-    o.license(name='WTFPL')
-    r = _basic_document()
-    r['info']['title'] = 'Title'
-    r['info']['version'] = 'Version'
-    r['info']['license'] = {}
-    r['info']['license']['name'] = 'WTFPL'
-    assert o.document == r
-
-
-def test_update_license_optional():
-    o = OpenAPIContext('Title', 'Version')
-    o.license(
-        name='WTFPL',
-        url='http://example.com/'
-    )
-    r = _basic_document()
-    r['info']['title'] = 'Title'
-    r['info']['version'] = 'Version'
-    r['info']['license'] = {}
-    r['info']['license']['name'] = 'WTFPL'
-    r['info']['license']['url'] = 'http://example.com/'
+def test_add_server():
+    o = OpenAPIContext()
+    o.info(title='t', version='v')
+    o.server('http://localhost/')
+    r = {
+        'info': {'title': 't', 'version': 'v'},
+        'openapi': '3.0.3',
+        'paths': {},
+        'servers': [{'url': 'http://localhost/'}]
+    }
     assert o.document == r
 
 
 def test_add_path():
-    o = OpenAPIContext('t', 'v')
+    o = OpenAPIContext()
+    o.info(title='t', version='v')
     o.path('/api').get() \
         .parameter('p', in_='query', required=False) \
         .type('integer', default=0) \
@@ -119,7 +85,8 @@ def test_add_path():
 
 
 def test_summary():
-    o = OpenAPIContext('t', 'v')
+    o = OpenAPIContext()
+    o.info(title='t', version='v')
     o.path('/').summary('sum')
     r = {
         'info': {'title': 't', 'version': 'v'},
@@ -130,7 +97,8 @@ def test_summary():
 
 
 def test_desc():
-    o = OpenAPIContext('t', 'v')
+    o = OpenAPIContext()
+    o.info(title='t', version='v')
     o.path('/').description('d')
     r = {
         'info': {'title': 't', 'version': 'v'},
@@ -141,6 +109,7 @@ def test_desc():
 
 
 def test_multilevel_method_call():
-    o = OpenAPIContext('t', 'v')
+    o = OpenAPIContext()
+    o.info(title='t', version='v')
     with pytest.raises(AttributeError):
         o.path('/').get().info('cannot call')

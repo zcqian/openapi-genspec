@@ -30,6 +30,11 @@ class _BaseMetaClass(type):
 
         if 'CHILD_CONTEXTS' in attrs:
             for name, (ch_context, field) in attrs['CHILD_CONTEXTS'].items():
+                # FIXME: Hopefully we want the docstrings for params here
+                #  Which is kind of a problem because the "more root" types
+                #  are defined earlier, and to obtain the possible params
+                #  we need to look at the "less root" class which is yet to be
+                #  defined.
                 docstring = f"""Set {field}
                             Create {ch_context} and set {field}
                             """
@@ -56,9 +61,6 @@ class _BaseContext(metaclass=_BaseMetaClass):
 
     def __init__(self):
         self.document = {}
-
-    def _set(self, k, v):
-        self.document[k] = v
 
 
 class _ChildContext(_BaseContext):
@@ -119,68 +121,16 @@ class _HasTags(_BaseContext):
 
 
 class OpenAPIContext(_HasExternalDocs):
-    def __init__(self, title: str, version: str,
-                 description: Optional[str] = None):
+    CHILD_CONTEXTS = {
+        'info': ('OpenAPIInfoContext', 'info'),
+    }
+
+    def __init__(self):
         super(OpenAPIContext, self).__init__()
         self.document = {
             'openapi': '3.0.3',
-            'info': {
-                'title': title,
-                'version': version,
-            },
             'paths': {},
         }
-        if description:
-            self.document['info']['description'] = description
-
-    def _update_optional_fields(self, node: str, fields: List[str], kwargs):
-        d = self.document
-        for n in node.split('.'):
-            d = d.setdefault(n, {})
-        for k in fields:
-            v = kwargs.get(k, None)
-            if v:
-                d[k] = v
-
-    def info(self, **kwargs):
-        """
-        Set values in the 'info' field
-
-        Set or update values in the 'info' field.
-
-        :param str title: 'info.title'
-        :param str description: 'info.description'
-        :param str termsOfService: 'info.termsOfService'
-        :param str version: 'info.version'
-
-        """
-        self._update_optional_fields(
-            'info', ['title', 'description', 'termsOfService', 'version'],
-            kwargs
-        )
-        return self
-
-    def contact(self, **kwargs):
-        """
-        Set values in the 'info.contact' field
-
-        :param str name: 'info.contact.name'
-        :param str url: 'info.contact.url'
-        :param str email: 'info.contact.email'
-        """
-        self._update_optional_fields(
-            'info.contact', ['name', 'url', 'email'], kwargs)
-        return self
-
-    def license(self, name: str, **kwargs):
-        """
-        Set values in 'info.license'
-        :param str name:
-        :param str url:
-        """
-        self.document['info'].setdefault('license', {})['name'] = name
-        self._update_optional_fields('info.license', ['url'], kwargs)
-        return self
 
     def server(self, url: str, description: Optional[str] = None):
         servers = self.document.setdefault('servers', [])
@@ -204,15 +154,35 @@ class OpenAPIContext(_HasExternalDocs):
         return path_item
 
 
+class OpenAPIInfoContext(_ChildContext, _HasDescription):
+    ATTRIBUTE_FIELDS = {
+        'title': 'title',
+        'terms_of_service': 'termsOfService',
+        'version': 'version',
+    }
+    CHILD_CONTEXTS = {
+        'contact': ('OpenAPIContactContext', 'contact'),
+        'license': ('OpenAPILicenseContext', 'license'),
+    }
+
+
+class OpenAPIContactContext(_ChildContext):
+    ATTRIBUTE_FIELDS = {
+        'name': 'name',
+        'url': 'url',
+        'email': 'email',
+    }
+
+
+class OpenAPILicenseContext(_ChildContext):
+    ATTRIBUTE_FIELDS = {
+        'name': 'name',
+        'url': 'url',
+    }
+
+
 class OpenAPIPathContext(_ChildContext, _HasSummary, _HasDescription,
                          _HasParameters):
-    # def __init__(self, parent):
-    #     super(OpenAPIPathItem, self).__init__(parent)
-    #     for method in ['get', 'put', 'post', 'delete', 'options', 'head',
-    #                  'patch', 'trace']:
-    #         # def fn():
-    #         #     return self._method_operation(method)
-    #         self.__setattr__(method, lambda: self._method_operation(method))
     CHILD_CONTEXTS = {}
     for http_method in ['get', 'put', 'post', 'delete', 'options', 'head',
                          'patch', 'trace']:

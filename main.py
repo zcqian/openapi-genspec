@@ -5,8 +5,10 @@ import yaml
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    o = OpenAPIContext("Discovery App", "master")
-    o.path('/dataset')                                                      \
+    o = OpenAPIContext()
+    o                                                                       \
+   .info(title='test app', version='master')                               \
+    .path('/dataset')                                                       \
         .get()                                                              \
             .parameter('start', in_='query', required=False)                \
                 .type('integer')                                            \
