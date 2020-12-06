@@ -22,6 +22,6 @@ if __name__ == '__main__':
             .description('Get a dataset')                                   \
             .parameter('meta', in_='query', required=False)                 \
                 .type('boolean', default=False)                             \
-        .delete('del_dataset')
+        .delete(operation_id='del_dataset')
     yml = yaml.dump(o.document)
     print(yml)
