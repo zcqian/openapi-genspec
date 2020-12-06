@@ -113,3 +113,9 @@ def test_multilevel_method_call():
     o.info(title='t', version='v')
     with pytest.raises(AttributeError):
         o.path('/').get().info('cannot call')
+
+
+def test_no_attrib():
+    o = OpenAPIContext()
+    with pytest.raises(AttributeError):
+        o.info(title='t', version='v', non_existent=0)
