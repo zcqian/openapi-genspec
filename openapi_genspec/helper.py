@@ -1,7 +1,59 @@
-from typing import List, Optional
+from typing import List, Optional, MutableMapping, Type
 
 
-class _BaseContext:
+class _BaseMetaClass(type):
+    subclasses: MutableMapping[str, Type['_ChildContext']] = {}
+
+    def __new__(cls, clsname, bases, attrs):
+        def mk_ch_context_meth(child_context, field):
+            def fn(self, **kwargs):
+                ch_context = cls.subclasses[child_context](self)
+                for at, v in kwargs.items():
+                    if not at.startswith('_') and at in dir(ch_context):
+                        meth = getattr(ch_context, at)
+                        if callable(meth):
+                            meth(v)
+                            continue
+                    raise AttributeError(f"Child does not have {at}")
+                self.document[field] = ch_context.document
+                if len(kwargs) > 0:
+                    return self
+                else:
+                    return ch_context
+            return fn
+
+        def mk_attr_meth(field):
+            def fn(self, v):
+                self.document[field] = v
+                return self
+            return fn
+
+        if 'CHILD_CONTEXTS' in attrs:
+            for name, (ch_context, field) in attrs['CHILD_CONTEXTS'].items():
+                docstring = f"""Set {field}
+                            Create {ch_context} and set {field}
+                            """
+                meth = mk_ch_context_meth(ch_context, field)
+                meth.__doc__ = docstring
+                meth.__name__ = name
+                attrs[name] = meth
+        if 'ATTRIBUTE_FIELDS' in attrs:
+            for name, field in attrs['ATTRIBUTE_FIELDS'].items():
+                docstring = f"""Set {field} field"""
+                meth = mk_attr_meth(field)
+                meth.__doc__ = docstring
+                meth.__name__ = name
+                attrs[name] = meth
+
+        new_cls = type.__new__(cls, clsname, bases, attrs)
+        cls.subclasses[clsname] = new_cls
+        return new_cls
+
+
+class _BaseContext(metaclass=_BaseMetaClass):
+    CHILD_CONTEXTS = {}
+    ATTRIBUTE_FIELDS = {}
+
     def __init__(self):
         self.document = {}
 
@@ -42,22 +94,21 @@ class _HasParameters(_BaseContext):
 
 
 class _HasSummary(_BaseContext):
-    def summary(self, v):
-        self._set('summary', v)
-        return self
+    ATTRIBUTE_FIELDS = {
+        'summary': 'summary'
+    }
 
 
 class _HasDescription(_BaseContext):
-    def description(self, v):
-        self._set('description', v)
-        return self
+    ATTRIBUTE_FIELDS = {
+        'description': 'description'
+    }
 
 
 class _HasExternalDocs(_BaseContext):
-    def external_docs(self, url):
-        ext_doc_context = OpenAPIExternalDocsContext(self, url)
-        self.document['externalDocs'] = ext_doc_context.document
-        return ext_doc_context
+    CHILD_CONTEXTS = {
+        'external_docs': ('OpenAPIExternalDocsContext', 'externalDocs'),
+    }
 
 
 class _HasTags(_BaseContext):
@@ -162,27 +213,18 @@ class OpenAPIPathContext(_ChildContext, _HasSummary, _HasDescription,
     #         # def fn():
     #         #     return self._method_operation(method)
     #         self.__setattr__(method, lambda: self._method_operation(method))
-
-    def _method_operation(self, method, operation_id: Optional[str] = None):
-        operation_context = OpenAPIOperation(self)
-        self.document[method] = operation_context.document
-        if operation_id:
-            operation_context.operation_id(operation_id)
-        return operation_context
-
-    def __getattr__(self, attr_name):
-        if attr_name in ['get', 'put', 'post', 'delete', 'options', 'head',
+    CHILD_CONTEXTS = {}
+    for http_method in ['get', 'put', 'post', 'delete', 'options', 'head',
                          'patch', 'trace']:
-            def fn(op_id=None):
-                return self._method_operation(attr_name, op_id)
-
-            return fn
-        else:
-            return super(OpenAPIPathContext, self).__getattr__(attr_name)
+        CHILD_CONTEXTS[http_method] = ('OpenAPIOperation', http_method)
 
 
 class OpenAPIOperation(_ChildContext, _HasSummary, _HasExternalDocs, _HasTags,
                        _HasDescription, _HasParameters):
+    ATTRIBUTE_FIELDS = {
+        'operation_id': 'operationId'
+    }
+
     def __init__(self, parent):
         super(OpenAPIOperation, self).__init__(parent)
         self.document = {
@@ -193,12 +235,17 @@ class OpenAPIOperation(_ChildContext, _HasSummary, _HasExternalDocs, _HasTags,
             }
         }
 
-    def operation_id(self, op_id):
-        self.document['operationId'] = op_id
-        return self
-
 
 class OpenAPIParameterContext(_ChildContext, _HasDescription):
+    ATTRIBUTE_FIELDS = {
+        'deprecated': 'deprecated',
+        'allow_empty': 'allowEmptyValue',
+        'style': 'style',
+        'explode': 'explode',
+        'allow_reserved': 'allowReserved',
+        'schema': 'schema',
+    }
+
     def __init__(self, parent, name: str, in_: str, required: bool):
         super(OpenAPIParameterContext, self).__init__(parent)
         self.document = {
@@ -206,30 +253,6 @@ class OpenAPIParameterContext(_ChildContext, _HasDescription):
             'in': in_,
             'required': required,
         }
-
-    def deprecated(self, dep: bool):
-        self._set('deprecated', dep)
-        return self
-
-    def allow_empty(self, ae: bool):
-        self._set('allowEmptyValue', ae)
-        return self
-
-    def style(self, sty: str):
-        self._set('style', sty)
-        return self
-
-    def explode(self, exp: bool):
-        self._set('explode', exp)
-        return self
-
-    def allow_reserved(self, ar: bool):
-        self._set('allowReserved', ar)
-        return self
-
-    def schema(self, sch: dict):
-        self._set('schema', sch)
-        return self
 
     def type(self, typ: str, **kwargs):
         schema = {
@@ -244,8 +267,6 @@ class OpenAPIParameterContext(_ChildContext, _HasDescription):
 
 
 class OpenAPIExternalDocsContext(_ChildContext, _HasDescription):
-    def __init__(self, parent, url):
-        super(OpenAPIExternalDocsContext, self).__init__(parent)
-        self.document = {
-            'url': url,
-        }
+    ATTRIBUTE_FIELDS = {
+        'url': 'url',
+    }
